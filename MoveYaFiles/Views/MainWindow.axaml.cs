@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using MoveYaFiles.ViewModels;
 
+
 namespace MoveYaFiles.Views;
 
 public partial class MainWindow : Window
@@ -11,7 +12,15 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
     }
+    private void AddRule_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.AddRule();
+    }
 
+    private void RemoveRule_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.RemoveRule();
+    }
     private async void SelectSourceFolder_Click(object? sender, RoutedEventArgs e)
     {
         var topLevel = TopLevel.GetTopLevel(this);

@@ -44,8 +44,12 @@ public class TransferEngine
     {
         foreach (var rule in config.Rules)
         {
-            if(string.IsNullOrWhiteSpace(rule.SourcePath) || !Directory.Exists(rule.SourcePath))
+            if (string.IsNullOrWhiteSpace(rule.SourcePath) || !Directory.Exists(rule.SourcePath))
                 continue;
+
+            if (string.IsNullOrWhiteSpace(rule.DestinationPath))
+                continue;
+
             if (!Directory.Exists(rule.DestinationPath))
             {
                 Directory.CreateDirectory(rule.DestinationPath);
@@ -55,44 +59,57 @@ public class TransferEngine
             foreach (var filePath in files)
             {
                 var fileInfo = new FileInfo(filePath);
-                //war.rozszerzenia
+
+                // Warunek rozszerzenia
                 if (rule.AllowedExtensions != null && rule.AllowedExtensions.Length > 0)
                 {
+                    string fileExt = fileInfo.Extension.TrimStart('.').ToLower();
                     bool isAllowed = rule.AllowedExtensions.Any(ext =>
-                        ext.Equals(fileInfo.Extension, StringComparison.OrdinalIgnoreCase));
-                    
+                        ext.TrimStart('.').Equals(fileExt, StringComparison.OrdinalIgnoreCase));
+
                     if (!isAllowed) continue;
                 }
-                //war.rozmiaru
-                if (fileInfo.Length < rule.MinFileSizeBytes || fileInfo.Length > rule.MaxFileSizeBytes)
-                {
-                    continue;
-                }
-                //rozwiazywanie problemow z konfliktem nazw
+
+                // Warunek rozmiaru (sprawdzamy MaxFileSize tylko gdy jest > 0)
+                if (fileInfo.Length < rule.MinFileSizeBytes) continue;
+                if (rule.MaxFileSizeBytes > 0 && fileInfo.Length > rule.MaxFileSizeBytes) continue;
+
+                // Rozwiązywanie konfliktów nazw
                 var destinationFilePath = Path.Combine(rule.DestinationPath, fileInfo.Name);
+
                 if (File.Exists(destinationFilePath))
                 {
-                    switch (rule.ConflictStrategy)
+                    string strategy = rule.ConflictStrategy ?? "Skip";
+
+                    if (strategy.Contains("Skip"))
                     {
-                        case "Skip":
-                            continue;
-                        case "CustomSuffix":
-                            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileInfo.Name);
-                            var suffix = string.IsNullOrWhiteSpace(rule.CustomSuffix) ? "_copy" : rule.CustomSuffix;
-                            destinationFilePath = Path.Combine(rule.DestinationPath, $"{fileNameWithoutExtension}{suffix}{fileInfo.Extension}");
-                            break;
-                        case"AddTimestamp":
-                            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileInfo.Name);
-                            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                            var newFileName = $"{fileNameWithoutExt}_{timestamp}{fileInfo.Extension}";
-                            destinationFilePath = Path.Combine(rule.DestinationPath, newFileName);
-                            break;
-                        case"Overwrite":
-                            //przegrywa domyslnie  z flaga overwrite=true
-                            break;
+                        continue;
                     }
+                    else if (strategy.Contains("Custom"))
+                    {
+                        var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                        var suffix = string.IsNullOrWhiteSpace(rule.CustomSuffix) ? "_copy" : rule.CustomSuffix;
+                        destinationFilePath = Path.Combine(rule.DestinationPath, $"{fileNameWithoutExt}{suffix}{fileInfo.Extension}");
+                    }
+                    else if (strategy.Contains("Timestamp"))
+                    {
+                        var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                        destinationFilePath = Path.Combine(rule.DestinationPath, $"{fileNameWithoutExt}_{timestamp}{fileInfo.Extension}");
+                    }
+                    
                 }
-                File.Copy(filePath, destinationFilePath, overwrite: true);
+
+                // Bezpieczny transfer pliku
+                try
+                {
+                    File.Copy(filePath, destinationFilePath, overwrite: true);
+                   
+                }
+                catch
+                {
+                    
+                }
             }
         }
 
@@ -100,4 +117,3 @@ public class TransferEngine
         SaveConfig(config);
     }
 }
-

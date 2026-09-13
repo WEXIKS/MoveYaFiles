@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using Avalonia.Threading;
 using MoveYaFiles.Services;
 using System.Linq;
+using Microsoft.Win32;
+using System.Collections.ObjectModel;
+using MoveYaFiles.Models;
+using System.Windows.Input;
+using CommunityToolkit.Mvvm.Input;
 
 namespace MoveYaFiles.ViewModels;
 
@@ -19,6 +24,142 @@ public class MainViewModel : ViewModelBase
     private string _fileExtensions = string.Empty;
     private string _selectedConflictStrategy = "Skip";
     private string _customSuffix = "_copy";
+    private string _selectedInterval = "30 minutes";
+    private bool _runAtStartup;
+    
+    public ObservableCollection<TransferRule> Rules { get; set; } = new();
+
+    private TransferRule? _selectedRule;
+    private string _lastSyncText = "Last sync: Never";
+    public ICommand RunArchivingCommand { get; }
+  
+    public string LastSyncText
+    {
+        get => _lastSyncText;
+        set => SetProperty(ref _lastSyncText, value);
+    }
+
+    private string _nextSyncText = "Next auto-archiving in: --:--";
+    public string NextSyncText
+    {
+        get => _nextSyncText;
+        set => SetProperty(ref _nextSyncText, value);
+    }
+
+    private string _statusText = "Ready to use";
+    public string StatusText
+    {
+        get => _statusText;
+        set => SetProperty(ref _statusText, value);
+    }
+    public TransferRule? SelectedRule
+    {
+        get => _selectedRule;
+        set
+        {
+            if (SetProperty(ref _selectedRule, value))
+            {
+                // Powiadom UI o zmianie powiązanych pól wybranej reguły
+                OnPropertyChanged(nameof(HasSelectedRule));
+            }
+        }
+    }
+
+    public bool HasSelectedRule => SelectedRule != null;
+    public void AddRule()
+    {
+        var newRule = new TransferRule
+        {
+            SourcePath = "",
+            DestinationPath = "",
+            ConflictStrategy = "Skip",
+            IntervalMinutes = 30
+        };
+    
+        Rules.Add(newRule);
+        SelectedRule = newRule;
+        SaveCurrentPaths();
+    }
+
+    public void RemoveRule()
+    {
+        if (SelectedRule != null)
+        {
+            Rules.Remove(SelectedRule);
+            SelectedRule = Rules.FirstOrDefault();
+            SaveCurrentPaths();
+        }
+    }
+
+    public bool RunAtStartup
+    {
+        get => _runAtStartup;
+        set
+        {
+            if (SetProperty(ref _runAtStartup, value))
+            {
+                SetAutostart(value);
+            }
+        }
+    }
+
+    private void SetAutostart(bool enable)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", writable: true);
+        if (key is null) return;
+
+        string? appPath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(appPath)) return;
+
+        if (enable)
+        {
+            key.SetValue("MoveYaFiles", $"\"{appPath}\"");
+        }
+        else
+        {
+            if (key.GetValue("MoveYaFiles") is not null)
+            {
+                key.DeleteValue("MoveYaFiles", throwOnMissingValue: false);
+            }
+        }
+    }
+
+    public Dictionary<string, int> IntervalOptions { get; } = new()
+    {
+        { "15 minutes", 15 },
+        { "30 minutes", 30 },
+        { "1 hour", 60 },
+        { "6 hours", 360 },
+        { "24 hours", 1440 },
+        { "7 days", 10080 },
+        { "30 days (Monthly)", 43200 }
+    };
+
+    public string SelectedInterval
+    {
+        get => _selectedInterval;
+        set
+        {
+            if (SetProperty(ref _selectedInterval, value))
+            {
+                UpdateTimerInterval();
+                SaveCurrentPaths();
+            }
+        }
+    }
+
+    private void UpdateTimerInterval()
+    {
+        if (IntervalOptions.TryGetValue(SelectedInterval, out int minutes))
+        {
+            if (_timer != null)
+            {
+                _timer.Interval = TimeSpan.FromMinutes(minutes);
+            }
+        }
+    }
 
     public List<string> ConflictStrategies { get; } = new()
     {
@@ -101,6 +242,7 @@ public class MainViewModel : ViewModelBase
         LoadPathsFromConfig();
         RefreshLastRun();
         StartTimer();
+        RunArchivingCommand = new RelayCommand(RunTransfer);
     }
 
     private void LoadPathsFromConfig()
@@ -119,7 +261,14 @@ public class MainViewModel : ViewModelBase
                 _ => "Skip"
             };
             _customSuffix = string.IsNullOrEmpty(config.Rules[0].CustomSuffix) ? "_copy" : config.Rules[0].CustomSuffix;
-            
+            int savedMinutes = config.Rules[0].IntervalMinutes;
+            _selectedInterval = IntervalOptions.FirstOrDefault(x => x.Value == savedMinutes).Key ?? "30 minutes" ;
+            UpdateTimerInterval();
+            if (OperatingSystem.IsWindows())
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
+                _runAtStartup = key?.GetValue("MoveYaFiles") != null;
+            }
         }
     }
 
@@ -146,6 +295,10 @@ public class MainViewModel : ViewModelBase
             _ => "Skip"
         };
         config.Rules[0].CustomSuffix = CustomSuffix;
+        if (IntervalOptions.TryGetValue(SelectedInterval, out int minutes))
+        {
+            config.Rules[0].IntervalMinutes = minutes;
+        }
     }
 
     public void RunTransfer()
