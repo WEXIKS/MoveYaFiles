@@ -12,7 +12,8 @@ public class TransferRule
     public long MaxFileSizeBytes { get; set; } = long.MaxValue;
     public string ConflictStrategy { get; set; } = "AddTimestamp";
 
-    public string FileExtension { get; set; } = string.Empty;
+    public string FileExtensions { get; set; } = string.Empty;
+    public string CustomSuffix { get; set; } = "_copy";
 }
 
 public class AppConfig

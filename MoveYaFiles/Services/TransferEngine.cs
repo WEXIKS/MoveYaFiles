@@ -76,6 +76,11 @@ public class TransferEngine
                     {
                         case "Skip":
                             continue;
+                        case "CustomSuffix":
+                            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                            var suffix = string.IsNullOrWhiteSpace(rule.CustomSuffix) ? "_copy" : rule.CustomSuffix;
+                            destinationFilePath = Path.Combine(rule.DestinationPath, $"{fileNameWithoutExtension}{suffix}{fileInfo.Extension}");
+                            break;
                         case"AddTimestamp":
                             var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileInfo.Name);
                             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");

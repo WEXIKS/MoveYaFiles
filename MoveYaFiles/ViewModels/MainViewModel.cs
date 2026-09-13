@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia.Threading;
 using MoveYaFiles.Services;
 using System.Linq;
@@ -16,7 +17,40 @@ public class MainViewModel : ViewModelBase
     private DispatcherTimer? _timer;
     private int _secondsRemaining;
     private string _fileExtensions = string.Empty;
+    private string _selectedConflictStrategy = "Skip";
+    private string _customSuffix = "_copy";
 
+    public List<string> ConflictStrategies { get; } = new()
+    {
+        "Skip",
+        "Overwrite",
+        "Timestamp (_yyyyMMdd_HHmmss)",
+        "Own suffix"
+
+    };
+
+    public string SelectedConflictStrategy
+    {
+        get => _selectedConflictStrategy;
+        set
+        {
+            if (SetProperty(ref _selectedConflictStrategy, value))
+            {
+                OnPropertyChanged(nameof(IsCustomSuffixEnabled));
+                SaveCurrentPaths();
+            }
+        }
+    }
+
+    public string CustomSuffix
+    {
+        get => _customSuffix;
+        set
+        {
+            if(SetProperty(ref _customSuffix, value)) SaveCurrentPaths();
+        }
+    }
+    public bool IsCustomSuffixEnabled => SelectedConflictStrategy == "Own suffix";
     public string FileExtensions
     {
         get => _fileExtensions;
@@ -76,7 +110,16 @@ public class MainViewModel : ViewModelBase
         {
             _sourcePath = config.Rules[0].SourcePath;
             _destinationPath = config.Rules[0].DestinationPath;
-            _fileExtensions = string.Join(", ", config.Rules[-1].AllowedExtensions); 
+            _fileExtensions = string.Join(", ", config.Rules[0].AllowedExtensions); 
+            _selectedConflictStrategy = config.Rules[0].ConflictStrategy switch
+            {
+                "Overwrite" => "Overwrite",
+                "AddTimestamp" => "Timestamp (_yyyyMMdd_HHmmss)",
+                "CustomSuffix" => "Own suffix",
+                _ => "Skip"
+            };
+            _customSuffix = string.IsNullOrEmpty(config.Rules[0].CustomSuffix) ? "_copy" : config.Rules[0].CustomSuffix;
+            
         }
     }
 
@@ -95,6 +138,14 @@ public class MainViewModel : ViewModelBase
             : FileExtensions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(ext => ext.StartsWith(".") ? ext : "." + ext)
                 .ToArray();
+        config.Rules[0].ConflictStrategy = SelectedConflictStrategy switch
+        {
+            "Overwrite" => "Overwrite",
+            "Timestamp (_yyyyMMdd_HHmmss)" => "AddTimestamp",
+            "Custom Suffix" => "CustomSuffix",
+            _ => "Skip"
+        };
+        config.Rules[0].CustomSuffix = CustomSuffix;
     }
 
     public void RunTransfer()
