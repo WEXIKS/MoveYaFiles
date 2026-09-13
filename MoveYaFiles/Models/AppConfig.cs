@@ -11,6 +11,8 @@ public class TransferRule
     public long MinFileSizeBytes { get; set; } = 0; //2 GB = 2147483648 bajtów
     public long MaxFileSizeBytes { get; set; } = long.MaxValue;
     public string ConflictStrategy { get; set; } = "AddTimestamp";
+
+    public string FileExtension { get; set; } = string.Empty;
 }
 
 public class AppConfig

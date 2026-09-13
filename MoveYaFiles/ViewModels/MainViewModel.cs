@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Threading;
 using MoveYaFiles.Services;
-
+using System.Linq;
 
 namespace MoveYaFiles.ViewModels;
 
@@ -15,6 +15,16 @@ public class MainViewModel : ViewModelBase
     private string _destinationPath = string.Empty;
     private DispatcherTimer? _timer;
     private int _secondsRemaining;
+    private string _fileExtensions = string.Empty;
+
+    public string FileExtensions
+    {
+        get => _fileExtensions;
+        set
+        {
+            if(SetProperty(ref _fileExtensions, value)) SaveCurrentPaths();
+        }
+    }
 
     public string StatusMessage
     {
@@ -66,6 +76,7 @@ public class MainViewModel : ViewModelBase
         {
             _sourcePath = config.Rules[0].SourcePath;
             _destinationPath = config.Rules[0].DestinationPath;
+            _fileExtensions = string.Join(", ", config.Rules[-1].AllowedExtensions); 
         }
     }
 
@@ -79,6 +90,11 @@ public class MainViewModel : ViewModelBase
         config.Rules[0].SourcePath = SourcePath;
         config.Rules[0].DestinationPath = DestinationPath;
         _engine.SaveConfig(config);
+        config.Rules[0].AllowedExtensions = string.IsNullOrWhiteSpace(FileExtensions)
+            ? Array.Empty<string>()
+            : FileExtensions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(ext => ext.StartsWith(".") ? ext : "." + ext)
+                .ToArray();
     }
 
     public void RunTransfer()
