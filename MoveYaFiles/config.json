@@ -1,0 +1,14 @@
+{
+  "IntervalMinutes": 30,
+  "AutoStartWithSystem": false,
+  "LastRun": null,
+  "Rules": [
+    {
+      "sourcePath": "C:\\Users\\Public\\Downloads",
+      "DestinationPath": "D:\\Archive",
+      "AllowedExtensions": [".zip", ".iso",".mkv"],
+      "MinFileSizeBytes": 2147483648,
+      "ConflictStrategy": "AddTimestamp"
+    }
+  ]
+}
