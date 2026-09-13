@@ -1,22 +1,33 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:MoveYaFiles.ViewModels"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="MoveYaFiles.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="MoveYaFiles">
+        Title="MoveYaFiles - Menedżer Archiwizacji"
+        Width="500" Height="300"
+        WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainViewModel />
+        <vm:MainViewModel/>
     </Design.DataContext>
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <StackPanel Margin="20" Spacing="15" VerticalAlignment="Center">
+        <TextBlock Text="MoveYaFiles" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
+        
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="5">
+            <TextBlock Text="Ostatnia synchronizacja:" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding LastRunText}"/>
+        </StackPanel>
 
+        <Button Content="Uruchom archiwizację teraz" 
+                Command="{Binding RunTransfer}" 
+                HorizontalAlignment="Center" 
+                Padding="15,8"/>
+
+        <TextBlock Text="{Binding StatusMessage}" 
+                   HorizontalAlignment="Center" 
+                   FontStyle="Italic" 
+                   Foreground="Gray"/>
+    </StackPanel>
 </Window>
