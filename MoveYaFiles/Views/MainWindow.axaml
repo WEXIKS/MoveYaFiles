@@ -5,19 +5,32 @@
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="MoveYaFiles - Menedżer Archiwizacji"
-        Width="500" Height="300"
+        Width="550" Height="400"
         WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
         <vm:MainViewModel/>
     </Design.DataContext>
 
-    <StackPanel Margin="20" Spacing="15" VerticalAlignment="Center">
+    <StackPanel Margin="20" Spacing="12" VerticalAlignment="Center">
         <TextBlock Text="MoveYaFiles" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
-        
+
+        <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" Margin="0,10">
+            <TextBox Grid.Row="0" Grid.Column="0" Text="{Binding SourcePath}" PlaceholderText="Folder źródłowy..." Margin="0,0,10,10"/>
+            <Button Grid.Row="0" Grid.Column="1" Content="Przeglądaj..." Click="SelectSourceFolder_Click" Margin="0,0,0,10"/>
+
+            <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding DestinationPath}" PlaceholderText="Folder docelowy..." Margin="0,0,10,0"/>
+            <Button Grid.Row="1" Grid.Column="1" Content="Przeglądaj..." Click="SelectDestinationFolder_Click"/>
+        </Grid>
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="5">
             <TextBlock Text="Ostatnia synchronizacja:" FontWeight="SemiBold"/>
             <TextBlock Text="{Binding LastRunText}"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="5">
+            <TextBlock Text="Następna automatyczna za:" Foreground="Gray"/>
+            <TextBlock Text="{Binding CountdownText}" FontWeight="Bold" Foreground="LimeGreen"/>
         </StackPanel>
 
         <Button Content="Uruchom archiwizację teraz" 
