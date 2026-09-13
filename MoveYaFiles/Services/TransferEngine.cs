@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -8,20 +9,16 @@ namespace MoveYaFiles.Services;
 
 public class TransferEngine
 {
-    private const string ConfigFilePath = "config.json";
+    private const string ConfigFileName = "config.json";
 
     public AppConfig LoadConfig()
     {
-        if (!File.Exists(ConfigFilePath))
-        {
-            var defaultConfig = new AppConfig();
-            SaveConfig(defaultConfig);
-            return defaultConfig;
-        }
+        if (!File.Exists(ConfigFileName))
+            return new AppConfig();
 
         try
         {
-            var json = File.ReadAllText(ConfigFilePath);
+            string json = File.ReadAllText(ConfigFileName);
             return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
         }
         catch
@@ -32,88 +29,136 @@ public class TransferEngine
 
     public void SaveConfig(AppConfig config)
     {
-        var options = new JsonSerializerOptions
+        try
         {
-            WriteIndented = true
-        };
-        var json = JsonSerializer.Serialize(config, options);
-        File.WriteAllText(ConfigFilePath, json);
+            string json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(ConfigFileName, json);
+        }
+        catch
+        {
+            // Ignorowanie błędów zapisu
+        }
     }
 
-    public void ExecuteTransfer(AppConfig config)
+    public (int totalMoved, List<LogEntry> newLogs) ExecuteTransfer(AppConfig config)
     {
+        int totalFilesMoved = 0;
+        var newLogs = new List<LogEntry>();
+
         foreach (var rule in config.Rules)
         {
-            if (string.IsNullOrWhiteSpace(rule.SourcePath) || !Directory.Exists(rule.SourcePath))
-                continue;
-
-            if (string.IsNullOrWhiteSpace(rule.DestinationPath))
-                continue;
-
-            if (!Directory.Exists(rule.DestinationPath))
+            if (string.IsNullOrWhiteSpace(rule.SourcePath) || string.IsNullOrWhiteSpace(rule.DestinationPath))
             {
-                Directory.CreateDirectory(rule.DestinationPath);
+                continue;
             }
 
-            var files = Directory.GetFiles(rule.SourcePath);
-            foreach (var filePath in files)
+            if (!Directory.Exists(rule.SourcePath))
             {
-                var fileInfo = new FileInfo(filePath);
-
-                // Warunek rozszerzenia
-                if (rule.AllowedExtensions != null && rule.AllowedExtensions.Length > 0)
+                newLogs.Add(new LogEntry
                 {
-                    string fileExt = fileInfo.Extension.TrimStart('.').ToLower();
-                    bool isAllowed = rule.AllowedExtensions.Any(ext =>
-                        ext.TrimStart('.').Equals(fileExt, StringComparison.OrdinalIgnoreCase));
+                    RuleName = rule.DisplayName,
+                    Status = "Error",
+                    Message = $"Ścieżka źródłowa nie istnieje: {rule.SourcePath}"
+                });
+                continue;
+            }
 
-                    if (!isAllowed) continue;
-                }
+            try
+            {
+                if (!Directory.Exists(rule.DestinationPath))
+                    Directory.CreateDirectory(rule.DestinationPath);
 
-                // Warunek rozmiaru (sprawdzamy MaxFileSize tylko gdy jest > 0)
-                if (fileInfo.Length < rule.MinFileSizeBytes) continue;
-                if (rule.MaxFileSizeBytes > 0 && fileInfo.Length > rule.MaxFileSizeBytes) continue;
+                var files = Directory.GetFiles(rule.SourcePath);
+                int movedForRule = 0;
 
-                // Rozwiązywanie konfliktów nazw
-                var destinationFilePath = Path.Combine(rule.DestinationPath, fileInfo.Name);
-
-                if (File.Exists(destinationFilePath))
+                foreach (var filePath in files)
                 {
-                    string strategy = rule.ConflictStrategy ?? "Skip";
+                    var fileInfo = new FileInfo(filePath);
 
-                    if (strategy.Contains("Skip"))
-                    {
+                    // Sprawdzenie limitów rozmiaru pliku
+                    if (fileInfo.Length < rule.MinFileSizeBytes || fileInfo.Length > rule.MaxFileSizeBytes)
                         continue;
-                    }
-                    else if (strategy.Contains("Custom"))
+
+                    // Sprawdzenie rozszerzeń (jeśli podano)
+                    if (rule.AllowedExtensions != null && rule.AllowedExtensions.Length > 0)
                     {
-                        var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileInfo.Name);
-                        var suffix = string.IsNullOrWhiteSpace(rule.CustomSuffix) ? "_copy" : rule.CustomSuffix;
-                        destinationFilePath = Path.Combine(rule.DestinationPath, $"{fileNameWithoutExt}{suffix}{fileInfo.Extension}");
+                        var fileExt = fileInfo.Extension.TrimStart('.').ToLowerInvariant();
+                        var allowed = rule.AllowedExtensions.Select(e => e.TrimStart('.').Trim().ToLowerInvariant());
+                        if (!allowed.Contains(fileExt))
+                            continue;
                     }
-                    else if (strategy.Contains("Timestamp"))
+
+                    string fileName = fileInfo.Name;
+                    string destFilePath = Path.Combine(rule.DestinationPath, fileName);
+
+                    // Obsługa konfliktów nazw
+                    if (File.Exists(destFilePath))
                     {
-                        var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileInfo.Name);
-                        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                        destinationFilePath = Path.Combine(rule.DestinationPath, $"{fileNameWithoutExt}_{timestamp}{fileInfo.Extension}");
+                        switch (rule.ConflictStrategy)
+                        {
+                            case "Skip":
+                                continue;
+
+                            case "Overwrite":
+                                File.Copy(filePath, destFilePath, true);
+                                File.Delete(filePath);
+                                movedForRule++;
+                                continue;
+
+                            case "AddTimestamp":
+                            case "Timestamp (_yyyyMMdd_HHmmss)":
+                                string nameNoExt = Path.GetFileNameWithoutExtension(fileName);
+                                string ext = fileInfo.Extension;
+                                destFilePath = Path.Combine(rule.DestinationPath, $"{nameNoExt}_{DateTime.Now:yyyyMMdd_HHmmss}{ext}");
+                                break;
+
+                            case "Custom Suffix":
+                                string name = Path.GetFileNameWithoutExtension(fileName);
+                                string extension = fileInfo.Extension;
+                                string suffix = string.IsNullOrWhiteSpace(rule.CustomSuffix) ? "_copy" : rule.CustomSuffix;
+                                destFilePath = Path.Combine(rule.DestinationPath, $"{name}{suffix}{extension}");
+                                break;
+                        }
                     }
-                    
+
+                    File.Move(filePath, destFilePath);
+                    movedForRule++;
                 }
 
-                // Bezpieczny transfer pliku
-                try
+                totalFilesMoved += movedForRule;
+                if (movedForRule > 0)
                 {
-                    File.Copy(filePath, destinationFilePath, overwrite: true);
-                   
+                    newLogs.Add(new LogEntry
+                    {
+                        RuleName = rule.DisplayName,
+                        Status = "OK",
+                        FilesMoved = movedForRule,
+                        Message = $"Przeniesiono pomyślnie {movedForRule} plików."
+                    });
                 }
-                catch
+            }
+            catch (Exception ex)
+            {
+                newLogs.Add(new LogEntry
                 {
-                    
-                }
+                    RuleName = rule.DisplayName,
+                    Status = "Error",
+                    Message = $"Błąd: {ex.Message}"
+                });
             }
         }
 
         config.LastRun = DateTime.Now;
+        
+        // Dodaj nowe logi na początek listy i przytnij do 100 wpisów
+        if (newLogs.Count > 0)
+        {
+            config.Logs.InsertRange(0, newLogs);
+            if (config.Logs.Count > 100)
+                config.Logs = config.Logs.Take(100).ToList();
+        }
+
         SaveConfig(config);
+        return (totalFilesMoved, newLogs);
     }
 }

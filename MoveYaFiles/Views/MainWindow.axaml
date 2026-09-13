@@ -1,95 +1,122 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:MoveYaFiles.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="700"
         x:Class="MoveYaFiles.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="MoveYaFiles"
-        Width="600" Height="650"
+        Width="600" Height="700"
         WindowStartupLocation="CenterScreen">
 
+    <Design.DataContext>
+        <vm:MainViewModel/>
+    </Design.DataContext>
+
     <ScrollViewer Margin="20">
-        <StackPanel Spacing="15">
+        <StackPanel Spacing="16">
 
             <!-- Tytuł -->
-            <TextBlock Text="MoveYaFiles" 
-                       FontSize="24" 
-                       FontWeight="Bold" 
-                       HorizontalAlignment="Center" />
+            <TextBlock Text="MoveYaFiles"
+                       FontSize="28"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,10"/>
 
-            <!-- Sekcja 1: Lista reguł (Multi-Rule) -->
-            <Grid ColumnDefinitions="*, Auto, Auto">
-                <ListBox Grid.Column="0" 
-                         ItemsSource="{Binding Rules}" 
-                         SelectedItem="{Binding SelectedRule}" 
-                         Height="90" 
-                         Margin="0,0,10,0">
+            <!-- Sekcja 1: Lista Reguł -->
+            <Grid ColumnDefinitions="*, Auto">
+                <ListBox Grid.Column="0"
+                         ItemsSource="{Binding Rules}"
+                         SelectedItem="{Binding SelectedRule}"
+                         Height="120">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding DisplayName}" />
+                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Top">
-                    <Button Content="Add Rule" Click="AddRule_Click" Width="90"/>
-                    <Button Content="Remove" Click="RemoveRule_Click" IsEnabled="{Binding HasSelectedRule}" Width="90"/>
+                <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="8">
+                    <Button Content="Add Rule" Click="AddRule_Click" Width="90" HorizontalContentAlignment="Center"/>
+                    <Button Content="Remove" Click="RemoveRule_Click" Width="90" HorizontalContentAlignment="Center" IsEnabled="{Binding HasSelectedRule}"/>
                 </StackPanel>
             </Grid>
 
-            <!-- Sekcja 2: Edycja ścieżek wybranej reguły -->
+            <!-- Sekcja 2: Edycja Wybranej Reguły -->
             <StackPanel Spacing="10" IsEnabled="{Binding HasSelectedRule}">
-                <!-- Foldery -->
-                <Grid ColumnDefinitions="*, Auto" Margin="0,0,0,5">
-                    <TextBox Grid.Column="0" Text="{Binding SelectedRule.SourcePath}" PlaceholderText="Source Folder Path" Margin="0,0,5,0"/>
-                    <Button Grid.Column="1" Content="Browse..." Click="SelectSourceFolder_Click"/>
+
+                <!-- Ścieżka źródłowa -->
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBox Grid.Column="0"
+                             Text="{Binding SourcePath}"
+                             PlaceholderText="Source Folder Path"/>
+                    <Button Grid.Column="1"
+                            Content="Browse..."
+                            Click="SelectSourceFolder_Click"
+                            Margin="8,0,0,0"/>
                 </Grid>
 
-                <Grid ColumnDefinitions="*, Auto" Margin="0,0,0,5">
-                    <TextBox Grid.Column="0" Text="{Binding SelectedRule.DestinationPath}" PlaceholderText="Destination Folder Path" Margin="0,0,5,0"/>
-                    <Button Grid.Column="1" Content="Browse..." Click="SelectDestinationFolder_Click"/>
+                <!-- Ścieżka docelowa -->
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBox Grid.Column="0"
+                             Text="{Binding DestinationPath}"
+                             PlaceholderText="Destination Folder Path"/>
+                    <Button Grid.Column="1"
+                            Content="Browse..."
+                            Click="SelectDestinationFolder_Click"
+                            Margin="8,0,0,0"/>
                 </Grid>
 
-                <!-- Filtry i Interwał -->
-                <TextBox Text="{Binding FileExtensions}" PlaceholderText="Allowed extensions (e.g. .pdf, .zip)" />
+                <!-- Rozszerzenia -->
+                <TextBox Text="{Binding FileExtensions}"
+                         PlaceholderText=".zip, .iso, .mkv"/>
 
-                <!-- Opcje konfliktów i sufiks -->
+                <!-- Strategie konfliktów -->
                 <Grid ColumnDefinitions="*, *">
-                    <ComboBox Grid.Column="0" 
-                              ItemsSource="{Binding ConflictStrategies}" 
-                              SelectedItem="{Binding SelectedConflictStrategy}" 
-                              HorizontalAlignment="Stretch" 
-                              Margin="0,0,5,0"/>
-
-                    <TextBox Grid.Column="1" 
-                             Text="{Binding CustomSuffix}" 
-                             PlaceholderText="Custom Suffix (e.g. _copy)" 
-                             IsEnabled="{Binding IsCustomSuffixEnabled}" 
-                             Margin="5,0,0,0"/>
-                </Grid>
-
-                <!-- Interwał czasowy -->
-                <Grid ColumnDefinitions="Auto, *">
-                    <TextBlock Text="Interval:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <ComboBox Grid.Column="1" 
-                              ItemsSource="{Binding IntervalOptions.Keys}" 
-                              SelectedItem="{Binding SelectedInterval}" 
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{Binding ConflictStrategies}"
+                              SelectedItem="{Binding SelectedConflictStrategy}"
                               HorizontalAlignment="Stretch"/>
+
+                    <TextBox Grid.Column="1"
+                             Text="{Binding CustomSuffix}"
+                             IsEnabled="{Binding IsCustomSuffixEnabled}"
+                             PlaceholderText="_kopia"
+                             Margin="8,0,0,0"/>
                 </Grid>
+
+                <!-- Interwał timera -->
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="Interval:" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    <ComboBox ItemsSource="{Binding IntervalOptions}"
+                              SelectedItem="{Binding SelectedInterval}"
+                              Width="180"/>
+                </StackPanel>
             </StackPanel>
 
-            <Separator Margin="0,10"/>
+            <Rectangle Height="1" Fill="Gray" Margin="0,10"/>
 
             <!-- Sekcja 3: Status i Automatyzacja -->
             <StackPanel Spacing="8" HorizontalAlignment="Center">
                 <TextBlock Text="{Binding LastSyncText}" HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding NextSyncText}" 
-                           Foreground="Green" 
-                           FontWeight="Bold" 
+                <TextBlock Text="{Binding NextSyncText}"
+                           Foreground="Green"
+                           FontWeight="Bold"
                            HorizontalAlignment="Center"/>
 
-                <Button Content="Run archiving now" Command="{Binding RunArchivingCommand}" HorizontalAlignment="Center"/>
-                <CheckBox Content="Start with Windows" IsChecked="{Binding RunAtStartup}" HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding StatusText}" Foreground="Gray" HorizontalAlignment="Center" FontSize="12"/>
+                <Button Content="Run archiving now"
+                        Command="{Binding RunArchivingCommand}"
+                        HorizontalAlignment="Center"/>
+
+                <CheckBox Content="Start with Windows"
+                          IsChecked="{Binding RunAtStartup}"
+                          HorizontalAlignment="Center"/>
+
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="Gray"
+                           HorizontalAlignment="Center"
+                           FontSize="12"/>
             </StackPanel>
 
         </StackPanel>
